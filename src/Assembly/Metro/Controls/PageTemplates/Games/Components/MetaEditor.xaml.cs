@@ -832,34 +832,47 @@ namespace Assembly.Metro.Controls.PageTemplates.Games.Components
 			switch (_cache.Engine)
 			{
                 case EngineType.FourthGeneration:
+                    int dataSize;
+                    uint localOffset;
+                    uint dataAddress;
+                    int index;
 
 		            using (var stream = _fileManager.OpenReadWrite())
 		            {
-                        int dataSize = (int)(newSize - oldSize);
-                        var localOffset = oldAddress - 0x40000000;
-                        var dataAddress = (uint)_tag.RawTag.HeaderLocation.AsOffset() + localOffset + (uint)oldSize;
-                        newAddress = oldAddress;
-                        var index = _tag.RawTag.Index.Index;
 
-                        for (var i = index; i < _tags.Entries.Count; i++)
+                        if(oldAddress == 0)
                         {
-                            TagEntry t = _tags.Entries[i];
-                            if (t != null) t.RawTag.HeaderLocation.AddOffset(dataSize);
+                            // Allocate New Memory at Start
+                            newAddress = (uint)_tag.RawTag.HeaderLocation.AsOffset();
                         }
+                        else
+                        {
+                            dataSize = (int)(newSize - oldSize);
+                            localOffset = oldAddress - 0x40000000;
+                            dataAddress = (uint)_tag.RawTag.HeaderLocation.AsOffset() + localOffset + (uint)oldSize;
+                            newAddress = oldAddress;
+                            index = _tag.RawTag.Index.Index;
 
-
-
-
-
+                            for (var i = index; i < _tags.Entries.Count; i++)
+                            {
+                                TagEntry t = _tags.Entries[i];
+                                if (t != null) t.RawTag.HeaderLocation.AddOffset(dataSize);
+                            }
 
                             _cache.SaveChanges(stream);
 
-			            // If the block was made larger, zero extra data
-                        if (dataAddress != 0 && newSize > oldSize)
-			            {
-                            stream.SeekTo(dataAddress);
-                            StreamUtil.Fill(stream, 0, dataSize);
-			            }
+                            for(int i=0;i<_resultIndices.Count;i++)
+                            {
+
+                            }
+
+                            // If the block was made larger, zero extra data
+                            if (dataAddress != 0 && newSize > oldSize)
+                            {
+                                stream.SeekTo(dataAddress);
+                                StreamUtil.Fill(stream, 0, dataSize);
+                            }
+                        }
 		            }
             
 		            // Changing these causes a read from the file, so the stream has to be closed first
