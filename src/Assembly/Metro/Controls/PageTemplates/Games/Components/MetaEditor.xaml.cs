@@ -813,67 +813,155 @@ namespace Assembly.Metro.Controls.PageTemplates.Games.Components
 			e.CanExecute = true;
 		}
 
+
+
 		private void ReallocateCommand_Executed(object sender, ExecutedRoutedEventArgs e)
 		{
-			var field = GetWrappedField(e.OriginalSource) as ReflexiveData;
-			if (field == null)
-				return;
-			var newCount = MetroTagBlockReallocator.Show(_cache, field);
-			if (newCount == null || (int)newCount == field.Length)
-				return; // Canceled
+            var field = GetWrappedField(e.OriginalSource) as ReflexiveData;
+            if (field == null)
+                return;
+            var newCount = MetroTagBlockReallocator.Show(_cache, field);
+            if (newCount == null || (int)newCount == field.Length)
+                return; // Canceled
 
-			var oldAddress = field.FirstEntryAddress;
-			var oldSize = field.Length * field.EntrySize;
-			var newSize = (int)newCount * field.EntrySize;
-			uint newAddress;
-			using (var stream = _fileManager.OpenReadWrite())
-			{
-				// Reallocate the block
-				newAddress = _cache.Allocator.Reallocate(oldAddress, (int)oldSize, (int)newSize, (uint)field.Align, stream);
-				_cache.SaveChanges(stream);
+            var oldAddress = field.FirstEntryAddress;
+            var oldSize = field.Length * field.EntrySize;
+            var newSize = (int)newCount * field.EntrySize;
+            uint newAddress;
 
-				// If the block was made larger, zero extra data
-				if (newAddress != 0 && newSize > oldSize)
-				{
-					stream.SeekTo(_cache.MetaArea.PointerToOffset(newAddress) + oldSize);
-					StreamUtil.Fill(stream, 0, (int)(newSize - oldSize));
-				}
+			switch (_cache.Engine)
+			{
+                case EngineType.FourthGeneration:
+
+		            using (var stream = _fileManager.OpenReadWrite())
+		            {
+                        int dataSize = (int)(newSize - oldSize);
+                        var localOffset = oldAddress - 0x40000000;
+                        var dataAddress = (uint)_tag.RawTag.HeaderLocation.AsOffset() + localOffset + (uint)oldSize;
+                        newAddress = oldAddress;
+                        var index = _tag.RawTag.Index.Index;
+
+                        for (var i = index; i < _tags.Entries.Count; i++)
+                        {
+                            TagEntry t = _tags.Entries[i];
+                            if (t != null) t.RawTag.HeaderLocation.AddOffset(dataSize);
+                        }
+
+
+
+
+
+
+                            _cache.SaveChanges(stream);
+
+			            // If the block was made larger, zero extra data
+                        if (dataAddress != 0 && newSize > oldSize)
+			            {
+                            stream.SeekTo(dataAddress);
+                            StreamUtil.Fill(stream, 0, dataSize);
+			            }
+		            }
+            
+		            // Changing these causes a read from the file, so the stream has to be closed first
+		            field.Length = (int)newCount;
+		            field.FirstEntryAddress = newAddress;
+
+		            using (var stream = _fileManager.OpenReadWrite())
+		            {
+			            // Force a save back to the file
+			            var changes = new FieldChangeSet();
+			            changes.MarkChanged(field);
+			            var metaUpdate = new MetaWriter(stream, _tag.RawTag.HeaderLocation == null ? 0 : (uint)_tag.RawTag.HeaderLocation.AsOffset(), (uint)_tag.RawTag.MetaLocation.AsOffset(), _cache, _buildInfo,
+				            MetaWriter.SaveType.File, changes, _stringIdTrie);
+			            metaUpdate.WriteFields(_pluginVisitor.Values);
+			            _fileChanges.MarkUnchanged(field);
+		            }
+		            if (newAddress == oldAddress)
+		            {
+			            MetroMessageBox.Show("Tag Block Reallocator - Assembly",
+				            "The tag block was resized successfully. Its address did not change.");
+		            }
+		            else if (oldAddress == 0)
+		            {
+			            MetroMessageBox.Show("Tag Block Reallocator - Assembly",
+				            "The tag block was allocated successfully. Its address is 0x" + newAddress.ToString("X8") + ".");
+		            }
+		            else if (newAddress != 0)
+		            {
+			            MetroMessageBox.Show("Tag Block Reallocator - Assembly",
+				            "The tag block was reallocated successfully. Its new address is 0x" + newAddress.ToString("X8") + ".");
+		            }
+		            else
+		            {
+			            MetroMessageBox.Show("Tag Block Reallocator - Assembly",
+				            "The tag block was freed successfully.");
+		            }
+                    break;
+                default:
+
+		            using (var stream = _fileManager.OpenReadWrite())
+		            {
+			            // Reallocate the block
+			            newAddress = _cache.Allocator.Reallocate(oldAddress, (int)oldSize, (int)newSize, (uint)field.Align, stream);
+
+			            _cache.SaveChanges(stream);
+
+			            // If the block was made larger, zero extra data
+			            if (newAddress != 0 && newSize > oldSize)
+			            {
+				            stream.SeekTo(_cache.MetaArea.PointerToOffset(newAddress) + oldSize);
+				            StreamUtil.Fill(stream, 0, (int)(newSize - oldSize));
+			            }
+		            }
+            
+		            // Changing these causes a read from the file, so the stream has to be closed first
+		            field.Length = (int)newCount;
+		            field.FirstEntryAddress = newAddress;
+
+		            using (var stream = _fileManager.OpenReadWrite())
+		            {
+			            // Force a save back to the file
+			            var changes = new FieldChangeSet();
+			            changes.MarkChanged(field);
+			            var metaUpdate = new MetaWriter(stream, _tag.RawTag.HeaderLocation == null ? 0 : (uint)_tag.RawTag.HeaderLocation.AsOffset(), (uint)_tag.RawTag.MetaLocation.AsOffset(), _cache, _buildInfo,
+				            MetaWriter.SaveType.File, changes, _stringIdTrie);
+			            metaUpdate.WriteFields(_pluginVisitor.Values);
+			            _fileChanges.MarkUnchanged(field);
+		            }
+		            if (newAddress == oldAddress)
+		            {
+			            MetroMessageBox.Show("Tag Block Reallocator - Assembly",
+				            "The tag block was resized successfully. Its address did not change.");
+		            }
+		            else if (oldAddress == 0)
+		            {
+			            MetroMessageBox.Show("Tag Block Reallocator - Assembly",
+				            "The tag block was allocated successfully. Its address is 0x" + newAddress.ToString("X8") + ".");
+		            }
+		            else if (newAddress != 0)
+		            {
+			            MetroMessageBox.Show("Tag Block Reallocator - Assembly",
+				            "The tag block was reallocated successfully. Its new address is 0x" + newAddress.ToString("X8") + ".");
+		            }
+		            else
+		            {
+			            MetroMessageBox.Show("Tag Block Reallocator - Assembly",
+				            "The tag block was freed successfully.");
+		            }
+                    break;
 			}
 
-			// Changing these causes a read from the file, so the stream has to be closed first
-			field.Length = (int)newCount;
-			field.FirstEntryAddress = newAddress;
 
-			using (var stream = _fileManager.OpenReadWrite())
-			{
-				// Force a save back to the file
-				var changes = new FieldChangeSet();
-				changes.MarkChanged(field);
-				var metaUpdate = new MetaWriter(stream, _tag.RawTag.HeaderLocation == null ? 0 : (uint)_tag.RawTag.HeaderLocation.AsOffset(), (uint)_tag.RawTag.MetaLocation.AsOffset(), _cache, _buildInfo,
-					MetaWriter.SaveType.File, changes, _stringIdTrie);
-				metaUpdate.WriteFields(_pluginVisitor.Values);
-				_fileChanges.MarkUnchanged(field);
-			}
-			if (newAddress == oldAddress)
-			{
-				MetroMessageBox.Show("Tag Block Reallocator - Assembly",
-					"The tag block was resized successfully. Its address did not change.");
-			}
-			else if (oldAddress == 0)
-			{
-				MetroMessageBox.Show("Tag Block Reallocator - Assembly",
-					"The tag block was allocated successfully. Its address is 0x" + newAddress.ToString("X8") + ".");
-			}
-			else if (newAddress != 0)
-			{
-				MetroMessageBox.Show("Tag Block Reallocator - Assembly",
-					"The tag block was reallocated successfully. Its new address is 0x" + newAddress.ToString("X8") + ".");
-			}
-			else
-			{
-				MetroMessageBox.Show("Tag Block Reallocator - Assembly",
-					"The tag block was freed successfully.");
-			}
+
+
+
+
+
+
+
+
+
+
 		}
 	}
 }

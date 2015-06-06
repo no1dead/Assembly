@@ -10,7 +10,7 @@ namespace Blamite.IO
 		private readonly bool _baseBottomResizes;
 		private readonly FileSegmentGroup _baseGroup;
 		private readonly FileSegment _baseSegment;
-		private readonly int _baseSegmentDelta;
+		private int _baseSegmentDelta;
 		private readonly int _originalBaseSize;
 
         public SegmentPointer(FileSegment baseSegment, FileSegmentGroup baseGroup, int baseSegmentDelta)
@@ -40,6 +40,11 @@ namespace Blamite.IO
 			int baseSegmentDelta = fileOffset - baseSegment.Offset;
 			return new SegmentPointer(baseSegment, baseGroup, baseSegmentDelta);
 		}
+
+        public void AddOffset(int offset)
+        {
+            _baseSegmentDelta += offset;
+        }
 
 		/// <summary>
 		///     Given a pointer, creates a SegmentPointer which points to a segment in a certain group.
