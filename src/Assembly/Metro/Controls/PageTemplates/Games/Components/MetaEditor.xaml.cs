@@ -859,12 +859,20 @@ namespace Assembly.Metro.Controls.PageTemplates.Games.Components
                                 if (t != null) t.RawTag.HeaderLocation.AddOffset(dataSize);
                             }
 
-                            _cache.SaveChanges(stream);
+                            
 
-                            for(int i=0;i<_resultIndices.Count;i++)
+
+
+                            for (int i = 0; i < panelMetaComponents.Items.Count; i++)
                             {
-
+                                if(panelMetaComponents.Items[i] is ReflexiveData)
+                                {
+                                    ReflexiveData reflexivedata = (ReflexiveData)panelMetaComponents.Items[i];
+                                    if (reflexivedata.Offset > oldAddress) reflexivedata.FirstEntryAddress += (uint)dataSize;
+                                }
                             }
+
+                            _cache.SaveChanges(stream);
 
                             // If the block was made larger, zero extra data
                             if (dataAddress != 0 && newSize > oldSize)
